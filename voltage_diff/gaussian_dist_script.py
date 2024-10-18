@@ -3,18 +3,57 @@ import matplotlib.pyplot as plt
 import scipy as sc
 import glob, os
 
-def load_files(filepath):
-    global counts, bins
-    counts = np.loadtxt(filepath)
-    bins = np.array(range(1, 1 + np.size(counts)))
+def load_files(file_path):
+    numbers = []
+    within_data_section = False
+    mca_cal_value = None
+    
+    with open(file_path, 'r') as file:
+        for line in file:
+            if line.strip() == "$DATA:":
+                within_data_section = True
+                continue
+            
+            if line.strip() == "$ROI:":
+                within_data_section = False
+            
+            if within_data_section:
+                try:
+                    num = float(line.split()[0])
+                    numbers.append(num)
+                except ValueError:
+                    continue
+
+            if line.strip() == "$MCA_CAL:":
+                for _ in range(3):
+                    cal_line = file.readline()
+                    if cal_line:
+                        parts = cal_line.split()
+                        if len(parts) >= 2:
+                            try:
+                                mca_cal_value = float(parts[1])
+                            except ValueError:
+                                pass
+    counts = np.array(numbers[1:])
+    mca = mca_cal_value
+    bins = np.array(range(1,1+np.size(counts)))
+
+    print(f'counts prossesed - {np.sum(counts)}, mca value - {mca}, number of bins - {np.size(bins)}')
+
+    return counts, bins, mca
+
+
 
 def gaussian(x, amp, mean, std_dev):
     return amp * np.exp(-0.5 * ((x - mean) / std_dev) ** 2)
 
 def prosessing(width):
-    global param_array, fwhm_array, peaks, num, energy
-    peaks = np.array(sc.signal.find_peaks(counts, prominence=1e4)[0])
+    peak_indices, peak_dict = sc.signal.find_peaks(counts, prominence = 60, height=170, width=10)
+    peak_heights = peak_dict['peak_heights']
+    peaks = [peak_indices[np.argmax(peak_heights)], peak_indices[np.argpartition(peak_heights,-2)[-2]]]
     num = np.size(peaks)
+
+    [print(f'peaks found at {c*mca}') for c in peaks]
 
     param_array = np.zeros((num, 3))
     covariance_array = np.zeros((num, 4))
@@ -30,7 +69,7 @@ def prosessing(width):
             p0=initial_guess
         )
 
-        popt[1:] = popt[1:] * 4.882741E-001
+        popt[1:] = popt[1:] * mca
         param_array[c] = popt
         covariance_array[c] = [np.linalg.cond(pcov), *np.diag(pcov)]
         fitted_gaussians[c] = gaussian(bins[peaks[c] - width:peaks[c] + width], *popt)
@@ -43,10 +82,14 @@ def prosessing(width):
         print(f"  Covariance Diagonal (Variance of Amplitude, Mean, Std Dev) = {covariance_array[c][1]:.2e}, {covariance_array[c][2]:.2e}, {covariance_array[c][3]:.2e}")
         print("--------------------------------------------------------------")
 
-    energy = bins * 4.882741E-001
+        return  param_array, fwhm_array, peaks, num
+
+    
 
 def plotting(width):
     d = 100
+    energy = bins * mca
+
     plt.bar(energy[min(peaks) - d:max(peaks) + d], counts[min(peaks) - d:max(peaks) + d], edgecolor='grey', alpha=0.3)
 
     for c in range(0, num):
@@ -62,16 +105,12 @@ def plotting(width):
     plt.show()
 
 if __name__ == "__main__":
+    global counts, bins, mca
+    global param_array, fwhm_array, peaks, num
     width = 100
-
-    x = str(glob.glob(r'**/*.spe', recursive=True)[0])
-    print(x)
-
-    np.loadtxt(x)
-
-
-    for file in glob.glob(r'**/*.sple', recursive=True):
+    x = glob.glob(r'**\*spe', recursive=True)
+    for file in glob.glob(r'**/*.spe', recursive=True):
         print(f"Processing file: {file}")
-        load_files(file)
-        processing(width)
+        counts, bins, mca = load_files(file)
+        param_array, fwhm_array, peaks, num = prosessing(width)
         plotting(width)
