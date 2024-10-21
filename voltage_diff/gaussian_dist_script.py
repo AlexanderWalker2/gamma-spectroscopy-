@@ -52,7 +52,7 @@ def load_files(file_path):
 
     print(f'counts prossesed - {np.sum(counts)}, mca value - {mca}, number of bins - {np.size(bins)}')
 
-    return counts, bins, mca
+    return counts, bins, mca, measured_time
 
 
 
@@ -62,6 +62,10 @@ def gaussian(x, amp, mean, std_dev):
 def prosessing():
     energy = bins*mca
     start_val = 400
+    width = 100
+    activity = 4.2e5
+    emitted = activity*measured_time
+
     peak_indices, peak_dict = sc.signal.find_peaks(counts[energy > 400], prominence = 100, height=1, width=10)
     peak_heights = peak_dict['peak_heights']
     peak_indices=peak_indices + int(start_val/mca)
@@ -69,8 +73,6 @@ def prosessing():
     num = np.size(peaks)
 
     [print(f'peaks found at {c}') for c in peaks]
-
-    width = 100
 
     def gaussian(x, amp, mean, std_dev):
         return amp * np.exp(-0.5 * ((x - mean) / std_dev) ** 2)
@@ -80,23 +82,34 @@ def prosessing():
     fitted_gaussians = np.zeros((num,width*2))
     fwhm_array = np.zeros((num,1))
 
+
     
     for c in range(0, num):
         print(f'for peak, {peaks[c]}')
-        initial_guess = [counts[peaks[c]],peaks[c], 10]
+        initial_guess = [counts[peaks[c]],peaks[c], 1]
         popt, pcov = sc.optimize.curve_fit(gaussian, bins[peaks[c]-width:peaks[c]+width], counts[peaks[c]-width:peaks[c]+width], p0=initial_guess)
 
         popt[1:] = popt[1:]*mca
         param_array[c] = popt
         covariance_array[c] = [np.linalg.cond(pcov), *np.diag(pcov)]
-        fitted_gaussians[c] = gaussian(bins[peaks[c]-width:peaks[c]+width], *popt)
         fwhm_array[c] = 2 * np.sqrt(2 * np.log(2)) * popt[2]
+        fitted_gaussians[c] = gaussian(bins[peaks[c]-width:peaks[c]+width], *popt)
+
+        sum_counts = sum(counts[int(popt[1]/mca-fwhm_array[c]/mca):int(popt[1]/mca+fwhm_array[c]/mca)])
+        eff = sum_counts / emitted
+
+        #sum_counts = gaussian(bins[int(peaks[c]-fwhm_array[c]*2):int(peaks[c]+fwhm_array[c]*2)], *popt)
+        #print(sum_counts)
 
         print(f"Peak {c+1}:")
         print(f"  Amplitude = {popt[0]:.2f}, Mean = {popt[1]:.2f} keV, Std Dev = {popt[2]:.2f} keV")
         print(f"  FWHM = {fwhm_array[c][0]:.2f} keV")
         print(f"  Covariance Condition Number = {covariance_array[c][0]:.2e}")
         print(f"  Covariance Diagonal (Variance of Amplitude, Mean, Std Dev) = {covariance_array[c][1]:.2e}, {covariance_array[c][2]:.2e}, {covariance_array[c][3]:.2e}")
+        print(f'  Sum of counts at peak - {sum_counts:.2f}')
+        print(f'  Efficiency at peak - {eff:.6f}')
+        print(f'  Energy resolution - {fwhm_array[c]/popt[1]*100}')
+        #print(f'  Relative efficency - {popt[1]}')
         print("--------------------------------------------------------------")
 
     return  param_array, fwhm_array, peaks, num
@@ -118,11 +131,11 @@ def plotting():
 
 
 if __name__ == "__main__":
-    global counts, bins, mca, param_array, fwhm_array, peaks, num, width
+    global counts, bins, mca, param_array, fwhm_array, peaks, num, width, measured_time
     width = 100
 
     for file in glob.glob(r'**/*.spe', recursive=True):
         print(f"Processing file: {file}")
-        counts, bins, mca = load_files(file)
+        counts, bins, mca, measured_time = load_files(file)
         param_array, fwhm_array, peaks, num = prosessing()
         plotting()
