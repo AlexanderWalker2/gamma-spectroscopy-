@@ -7,6 +7,7 @@ def load_files(file_path):
     numbers = []
     within_data_section = False
     mca_cal_value = None
+    measured_time = None
     
     with open(file_path, 'r') as file:
         for line in file:
@@ -34,6 +35,17 @@ def load_files(file_path):
                                 mca_cal_value = float(parts[1])
                             except ValueError:
                                 pass
+
+            if line.strip() == "$MEAS_TIM:":
+                for _ in range(1):
+                    cal_line = file.readline()
+                    if cal_line:
+                        parts = cal_line.split()
+                        try:
+                            measured_time = float(parts[1])
+                        except ValueError:
+                            pass
+
     counts = np.array(numbers[1:])
     mca = mca_cal_value
     bins = np.array(range(1,1+np.size(counts)))
