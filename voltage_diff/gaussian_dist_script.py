@@ -77,30 +77,29 @@ def prosessing():
     def gaussian(x, amp, mean, std_dev):
         return amp * np.exp(-0.5 * ((x - mean) / std_dev) ** 2)
 
+    def inv_gauss(x, amp, mean, std_dev):
+        return ((-2*np.log(x/amp))**(1/2)*std_dev+mean)
+
+    def fwnm_eq(n, amp, mean, std_dev):
+        return (2*np.log(1/n))**(1/2)*std_dev+mean, -(2*np.log(1/n))**(1/2)*std_dev+mean
+
     param_array = np.zeros((num,3))
     covariance_array = np.zeros((num,4))
     fitted_gaussians = np.zeros((num,width*2))
     fwhm_array = np.zeros((num,1))
+    fwtm_array = np.zeros((num,1))
 
-
-    
     for c in range(0, num):
-        print(f'for peak, {peaks[c]}')
         initial_guess = [counts[peaks[c]],peaks[c], 1]
         popt, pcov = sc.optimize.curve_fit(gaussian, bins[peaks[c]-width:peaks[c]+width], counts[peaks[c]-width:peaks[c]+width], p0=initial_guess)
-
         popt[1:] = popt[1:]*mca
         param_array[c] = popt
         covariance_array[c] = [np.linalg.cond(pcov), *np.diag(pcov)]
-        fwhm_array[c] = 2 * np.sqrt(2 * np.log(2)) * popt[2]
+        fwhm_array[c] = 2 * (fwnm_eq(1/2, *popt)[0]-popt[1])
+        fwtm_array[c] = 2 * (fwnm_eq(1/10, *popt)[0]-popt[1])
         fitted_gaussians[c] = gaussian(bins[peaks[c]-width:peaks[c]+width], *popt)
-
         sum_counts = sum(counts[int(popt[1]/mca-fwhm_array[c]/mca):int(popt[1]/mca+fwhm_array[c]/mca)])
         eff = sum_counts / emitted
-
-        #sum_counts = gaussian(bins[int(peaks[c]-fwhm_array[c]*2):int(peaks[c]+fwhm_array[c]*2)], *popt)
-        #print(sum_counts)
-
         print(f"Peak {c+1}:")
         print(f"  Amplitude = {popt[0]:.2f}, Mean = {popt[1]:.2f} keV, Std Dev = {popt[2]:.2f} keV")
         print(f"  FWHM = {fwhm_array[c][0]:.2f} keV")
@@ -108,7 +107,8 @@ def prosessing():
         print(f"  Covariance Diagonal (Variance of Amplitude, Mean, Std Dev) = {covariance_array[c][1]:.2e}, {covariance_array[c][2]:.2e}, {covariance_array[c][3]:.2e}")
         print(f'  Sum of counts at peak - {sum_counts:.2f}')
         print(f'  Efficiency at peak - {eff:.6f}')
-        print(f'  Energy resolution - {fwhm_array[c]/popt[1]*100}')
+        print(f'  Energy resolution - {(fwhm_array[c]/popt[1]*100)[0]:.3f}')
+        print(f'  Peak shape fwhm / fwtm - {(fwhm_array[c]/fwtm_array[c])[0]:.3f}')
         #print(f'  Relative efficency - {popt[1]}')
         print("--------------------------------------------------------------")
 
@@ -121,8 +121,10 @@ def plotting():
     energy = bins*mca
 
     plt.bar(energy[min(peaks)-d:max(peaks)+d], counts[min(peaks)-d:max(peaks)+d], edgecolor='grey', alpha = 0.3)
-    [plt.plot([param_array[c][1]-fwhm_array[c]/2,param_array[c][1]-fwhm_array[c]/2], [0, gaussian(param_array[c][1]-fwhm_array[c]/2, *param_array[c])[0]],linestyle = '--', c = 'g') for c in range(0,num)]
-    [plt.plot([param_array[c][1]+fwhm_array[c]/2,param_array[c][1]+fwhm_array[c]/2], [0, gaussian(param_array[c][1]-fwhm_array[c]/2, *param_array[c])[0]],linestyle = '--', c = 'g') for c in range(0,num)]
+    [plt.plot([param_array[c][1]-fwhm_array[c]/2,param_array[c][1]-fwhm_array[c]/2], [0, gaussian(param_array[c][1]-fwhm_array[c]/2, *param_array[c])[0]],linestyle = '--', c = 'r') for c in range(0,num)]
+    [plt.plot([param_array[c][1]+fwhm_array[c]/2,param_array[c][1]+fwhm_array[c]/2], [0, gaussian(param_array[c][1]-fwhm_array[c]/2, *param_array[c])[0]],linestyle = '--', c = 'r') for c in range(0,num)]
+    [plt.plot([param_array[c][1]-fwtm_array[c]/2,param_array[c][1]-fwtm_array[c]/2], [0, gaussian(param_array[c][1]-fwtm_array[c]/2, *param_array[c])[0]],linestyle = '--', c = 'b') for c in range(0,num)]
+    [plt.plot([param_array[c][1]+fwtm_array[c]/2,param_array[c][1]+fwtm_array[c]/2], [0, gaussian(param_array[c][1]-fwtm_array[c]/2, *param_array[c])[0]],linestyle = '--', c = 'b') for c in range(0,num)]
     [plt.plot(energy[peaks[c]-width:peaks[c]+width], gaussian(energy[peaks[c]-width:peaks[c]+width], *param_array[c]), c='tab:orange') for c in range(0, num)]
 
     plt.xlabel(r'Energy [$KeV$]')
