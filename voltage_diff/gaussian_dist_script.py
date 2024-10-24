@@ -54,34 +54,35 @@ def load_files(file_path):
 
     return counts, bins, mca, measured_time
 
+def gaussian(x, amp, mean, std_dev):
+    return amp * np.exp(-0.5 * ((x - mean) / std_dev) ** 2)
 
+def inv_gauss(x, amp, mean, std_dev):
+    return ((-2*np.log(x/amp))**(1/2)*std_dev+mean)
+
+def fwnm_eq(n, amp, mean, std_dev):
+    return (2*np.log(1/n))**(1/2)*std_dev+mean, -(2*np.log(1/n))**(1/2)*std_dev+mean
 
 def gaussian(x, amp, mean, std_dev):
     return amp * np.exp(-0.5 * ((x - mean) / std_dev) ** 2)
 
 def prosessing():
+    scale_factor = measured_time/background_array[3]
+    counts_filterd = counts - background_array[0]*scale_factor
+    
     energy = bins*mca
     start_val = 400
     width = 100
     activity = 4.2e5
     emitted = activity*measured_time
 
-    peak_indices, peak_dict = sc.signal.find_peaks(counts[energy > 400], prominence = 100, height=1, width=10)
+    peak_indices, peak_dict = sc.signal.find_peaks(counts_filterd[energy > 400], prominence = 100, height=1, width=10)
     peak_heights = peak_dict['peak_heights']
     peak_indices=peak_indices + int(start_val/mca)
     peaks = [peak_indices[np.argmax(peak_heights)], peak_indices[np.argpartition(peak_heights,-2)[-2]]]
     num = np.size(peaks)
 
     [print(f'peaks found at {c}') for c in peaks]
-
-    def gaussian(x, amp, mean, std_dev):
-        return amp * np.exp(-0.5 * ((x - mean) / std_dev) ** 2)
-
-    def inv_gauss(x, amp, mean, std_dev):
-        return ((-2*np.log(x/amp))**(1/2)*std_dev+mean)
-
-    def fwnm_eq(n, amp, mean, std_dev):
-        return (2*np.log(1/n))**(1/2)*std_dev+mean, -(2*np.log(1/n))**(1/2)*std_dev+mean
 
     param_array = np.zeros((num,3))
     covariance_array = np.zeros((num,4))
@@ -90,15 +91,15 @@ def prosessing():
     fwtm_array = np.zeros((num,1))
 
     for c in range(0, num):
-        initial_guess = [counts[peaks[c]],peaks[c], 1]
-        popt, pcov = sc.optimize.curve_fit(gaussian, bins[peaks[c]-width:peaks[c]+width], counts[peaks[c]-width:peaks[c]+width], p0=initial_guess)
+        initial_guess = [counts_filterd[peaks[c]],peaks[c], 1]
+        popt, pcov = sc.optimize.curve_fit(gaussian, bins[peaks[c]-width:peaks[c]+width], counts_filterd[peaks[c]-width:peaks[c]+width], p0=initial_guess)
         popt[1:] = popt[1:]*mca
         param_array[c] = popt
         covariance_array[c] = [np.linalg.cond(pcov), *np.diag(pcov)]
         fwhm_array[c] = 2 * (fwnm_eq(1/2, *popt)[0]-popt[1])
         fwtm_array[c] = 2 * (fwnm_eq(1/10, *popt)[0]-popt[1])
         fitted_gaussians[c] = gaussian(bins[peaks[c]-width:peaks[c]+width], *popt)
-        sum_counts = sum(counts[int(popt[1]/mca-fwhm_array[c]/mca):int(popt[1]/mca+fwhm_array[c]/mca)])
+        sum_counts = sum(counts_filterd[int(popt[1]/mca-fwhm_array[c]/mca):int(popt[1]/mca+fwhm_array[c]/mca)])
         eff = sum_counts / emitted
         print(f"Peak {c+1}:")
         print(f"  Amplitude = {popt[0]:.2f}, Mean = {popt[1]:.2f} keV, Std Dev = {popt[2]:.2f} keV")
@@ -112,32 +113,57 @@ def prosessing():
         #print(f'  Relative efficency - {popt[1]}')
         print("--------------------------------------------------------------")
 
-    return  param_array, fwhm_array, peaks, num
+    return  param_array, fwhm_array, fwtm_array, peaks, num, counts_filterd
 
 
 def plotting():
     print('plotting')
     d=100
-    energy = bins*mca
-
-    plt.bar(energy[min(peaks)-d:max(peaks)+d], counts[min(peaks)-d:max(peaks)+d], edgecolor='grey', alpha = 0.3)
-    [plt.plot([param_array[c][1]-fwhm_array[c]/2,param_array[c][1]-fwhm_array[c]/2], [0, gaussian(param_array[c][1]-fwhm_array[c]/2, *param_array[c])[0]],linestyle = '--', c = 'r') for c in range(0,num)]
-    [plt.plot([param_array[c][1]+fwhm_array[c]/2,param_array[c][1]+fwhm_array[c]/2], [0, gaussian(param_array[c][1]-fwhm_array[c]/2, *param_array[c])[0]],linestyle = '--', c = 'r') for c in range(0,num)]
-    [plt.plot([param_array[c][1]-fwtm_array[c]/2,param_array[c][1]-fwtm_array[c]/2], [0, gaussian(param_array[c][1]-fwtm_array[c]/2, *param_array[c])[0]],linestyle = '--', c = 'b') for c in range(0,num)]
-    [plt.plot([param_array[c][1]+fwtm_array[c]/2,param_array[c][1]+fwtm_array[c]/2], [0, gaussian(param_array[c][1]-fwtm_array[c]/2, *param_array[c])[0]],linestyle = '--', c = 'b') for c in range(0,num)]
-    [plt.plot(energy[peaks[c]-width:peaks[c]+width], gaussian(energy[peaks[c]-width:peaks[c]+width], *param_array[c]), c='tab:orange') for c in range(0, num)]
-
-    plt.xlabel(r'Energy [$KeV$]')
-    plt.ylabel('counts')
+    first_peak=peaks[0]
+    second_peak=peaks[1]
+    energy=bins*mca
+    fig=plt.figure(figsize=(12,14))
+    ax1=fig.add_subplot(3,1,1)
+    ax2=fig.add_subplot(3,2,3)
+    ax3=fig.add_subplot(3,2,4)
+    ax1.bar(energy,counts,edgecolor='grey',alpha=0.3)
+    ax1.bar(energy,counts_filterd,edgecolor='b')
+    [ax1.plot(energy[peaks[c]-width:peaks[c]+width],gaussian(energy[peaks[c]-width:peaks[c]+width],*param_array[c]),c='tab:orange')for c in range(0,num)]
+    ax1.set_xlabel(r'Energy [$KeV$]')
+    ax1.set_ylabel('Counts')
+    ax1.set_title('Full Energy Spectrum')
+    ax2.bar(energy[first_peak-d:first_peak+d],counts[first_peak-d:first_peak+d],edgecolor='grey',alpha=0.3)
+    [ax2.plot([param_array[c][1]-fwhm_array[c]/2,param_array[c][1]-fwhm_array[c]/2],[0,gaussian(param_array[c][1]-fwhm_array[c]/2,*param_array[c])[0]],linestyle='--',c='r')for c in range(0,num)]
+    [ax2.plot([param_array[c][1]+fwhm_array[c]/2,param_array[c][1]+fwhm_array[c]/2],[0,gaussian(param_array[c][1]-fwhm_array[c]/2,*param_array[c])[0]],linestyle='--',c='r')for c in range(0,num)]
+    [ax2.plot([param_array[c][1]-fwtm_array[c]/2,param_array[c][1]-fwtm_array[c]/2],[0,gaussian(param_array[c][1]-fwtm_array[c]/2,*param_array[c])[0]],linestyle='--',c='b')for c in range(0,num)]
+    [ax2.plot([param_array[c][1]+fwtm_array[c]/2,param_array[c][1]+fwtm_array[c]/2],[0,gaussian(param_array[c][1]-fwtm_array[c]/2,*param_array[c])[0]],linestyle='--',c='b')for c in range(0,num)]
+    [ax2.plot(energy[peaks[c]-width:peaks[c]+width],gaussian(energy[peaks[c]-width:peaks[c]+width],*param_array[c]),c='tab:orange')for c in range(0,num)]
+    ax2.set_xlabel(r'Energy [$KeV$]')
+    ax2.set_ylabel('Counts')
+    ax2.set_title('Zoomed on First Peak')
+    ax2.set_xlim(energy[first_peak-d],energy[first_peak+d])
+    ax3.bar(energy[second_peak-d:second_peak+d],counts[second_peak-d:second_peak+d],edgecolor='grey',alpha=0.3)
+    [ax3.plot([param_array[c][1]-fwhm_array[c]/2,param_array[c][1]-fwhm_array[c]/2],[0,gaussian(param_array[c][1]-fwhm_array[c]/2,*param_array[c])[0]],linestyle='--',c='r')for c in range(0,num)]
+    [ax3.plot([param_array[c][1]+fwhm_array[c]/2,param_array[c][1]+fwhm_array[c]/2],[0,gaussian(param_array[c][1]-fwhm_array[c]/2,*param_array[c])[0]],linestyle='--',c='r')for c in range(0,num)]
+    [ax3.plot([param_array[c][1]-fwtm_array[c]/2,param_array[c][1]-fwtm_array[c]/2],[0,gaussian(param_array[c][1]-fwtm_array[c]/2,*param_array[c])[0]],linestyle='--',c='b')for c in range(0,num)]
+    [ax3.plot([param_array[c][1]+fwtm_array[c]/2,param_array[c][1]+fwtm_array[c]/2],[0,gaussian(param_array[c][1]-fwtm_array[c]/2,*param_array[c])[0]],linestyle='--',c='b')for c in range(0,num)]
+    [ax3.plot(energy[peaks[c]-width:peaks[c]+width],gaussian(energy[peaks[c]-width:peaks[c]+width],*param_array[c]),c='tab:orange')for c in range(0,num)]
+    ax3.set_xlabel(r'Energy [$KeV$]')
+    ax3.set_ylabel('Counts')
+    ax3.set_title('Zoomed on Second Peak')
+    ax3.set_xlim(energy[second_peak-d],energy[second_peak+d])
+    plt.tight_layout()
     plt.show()
 
 
-if __name__ == "__main__":
-    global counts, bins, mca, param_array, fwhm_array, peaks, num, width, measured_time
-    width = 100
 
+if __name__ == "__main__":
+    global counts, bins, mca, param_array, fwhm_array, peaks, num, width, measured_time, counts_filterd
+    width = 100
+    background_array = load_files(glob.glob(r'**/background.spe')[0])
     for file in glob.glob(r'**/*.spe', recursive=True):
         print(f"Processing file: {file}")
         counts, bins, mca, measured_time = load_files(file)
-        param_array, fwhm_array, peaks, num = prosessing()
+        param_array, fwhm_array, fwtm_array, peaks, num, counts_filterd = prosessing()
         plotting()
+        print('\n\n')
