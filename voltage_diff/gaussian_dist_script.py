@@ -5,6 +5,7 @@ import glob, os
 
 Iso_peaks = {
     'co_60' : 1173.2
+    'na_22' : 510.99
 }
 
 def load_files(file_path):
