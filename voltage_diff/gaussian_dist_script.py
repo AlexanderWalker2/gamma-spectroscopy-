@@ -4,11 +4,12 @@ import scipy as sc
 import glob, os
 
 Iso_peaks = {
-    'co_60' : 1173.2
-    'na_22' : 510.99
+    'co_60' : 1173.2,
+    'na' : 510.99
 }
 
 def load_files(file_path):
+    print(f"Processing file: {file_path}")
     numbers = []
     within_data_section = False
     measured_time = None
@@ -50,7 +51,7 @@ def load_files(file_path):
                         except ValueError:
                             pass
 
-    counts = np.array(numbers[1:])
+    counts = np.array(numbers[501:])
     bins = np.array(range(1,1+np.size(counts)))
 
     print(f'counts prossesed - {np.sum(counts)}, number of bins - {np.size(bins)}')
@@ -69,8 +70,8 @@ def fwnm_eq(n, amp, mean, std_dev):
 def gaussian(x, amp, mean, std_dev):
     return amp * np.exp(-0.5 * ((x - mean) / std_dev) ** 2)
 
-def prosessing():
-    scale_factor = measured_time/background_array[3]
+def prosessing(file_path):
+    scale_factor = measured_time/background_array[2]
     counts_filterd = counts - background_array[0]*scale_factor
 
     width = 100
@@ -79,10 +80,9 @@ def prosessing():
 
     peak_indices, peak_dict = sc.signal.find_peaks(counts_filterd, prominence = 100, height=1, width=10)
     peak_heights = peak_dict['peak_heights']
-    peak_indices=peak_indices + int(start_val/mca)
-    peaks = [peak_indices[np.argmax(peak_heights)], peak_indices[np.argpartition(peak_heights,-2)[-2]]]
-    num = np.size(peaks)
 
+    peaks = [peak_indices[np.argmax(peak_heights)]]
+    num = np.size(peaks)
     [print(f'peaks found at {c}') for c in peaks]
 
     param_array = np.zeros((num,3))
@@ -95,7 +95,7 @@ def prosessing():
         initial_guess = [counts_filterd[peaks[c]],peaks[c], 1]
         popt, pcov = sc.optimize.curve_fit(gaussian, bins[peaks[c]-width:peaks[c]+width], counts_filterd[peaks[c]-width:peaks[c]+width], p0=initial_guess)
         if c == 0:
-            mca = Iso_peaks['co_60']/popt[1]
+            mca = Iso_peaks[file_path[:2]]/popt[1]
             print(f'mca value - {mca}')
         popt[1:] = popt[1:]*mca
         param_array[c] = popt
@@ -124,7 +124,7 @@ def plotting():
     print('plotting')
     d=100
     first_peak=peaks[0]
-    second_peak=peaks[1]
+    #second_peak=peaks[1]
     energy=bins*mca
     fig=plt.figure(figsize=(12,14))
     ax1=fig.add_subplot(3,1,1)
@@ -146,6 +146,7 @@ def plotting():
     ax2.set_ylabel('Counts')
     ax2.set_title('Zoomed on First Peak')
     ax2.set_xlim(energy[first_peak-d],energy[first_peak+d])
+    ''' remove second peak graph, only one peak in spectrum
     ax3.bar(energy[second_peak-d:second_peak+d],counts[second_peak-d:second_peak+d],edgecolor='grey',alpha=0.3)
     [ax3.plot([param_array[c][1]-fwhm_array[c]/2,param_array[c][1]-fwhm_array[c]/2],[0,gaussian(param_array[c][1]-fwhm_array[c]/2,*param_array[c])[0]],linestyle='--',c='r')for c in range(0,num)]
     [ax3.plot([param_array[c][1]+fwhm_array[c]/2,param_array[c][1]+fwhm_array[c]/2],[0,gaussian(param_array[c][1]-fwhm_array[c]/2,*param_array[c])[0]],linestyle='--',c='r')for c in range(0,num)]
@@ -156,6 +157,7 @@ def plotting():
     ax3.set_ylabel('Counts')
     ax3.set_title('Zoomed on Second Peak')
     ax3.set_xlim(energy[second_peak-d],energy[second_peak+d])
+    '''
     plt.tight_layout()
     plt.show()
 
@@ -165,9 +167,10 @@ if __name__ == "__main__":
     global counts, bins, mca, param_array, fwhm_array, peaks, num, width, measured_time, counts_filterd
     width = 100
     background_array = load_files(glob.glob(r'**/background.spe')[0])
-    for file in glob.glob(r'**/*.spe', recursive=True):
-        print(f"Processing file: {file}")
+    print(background_array)
+    for file in [r'na_4kv_10mins\na-22_3cm.Spe']:#glob.glob(r'**/*.spe', recursive=True):
+        #print(f"Processing file: {file}")
         counts, bins, measured_time = load_files(file)
-        param_array, fwhm_array, fwtm_array, peaks, num, counts_filterd, mca = prosessing()
+        param_array, fwhm_array, fwtm_array, peaks, num, counts_filterd, mca = prosessing(file)
         plotting()
         print('\n\n')
