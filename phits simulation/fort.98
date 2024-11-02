@@ -1,0 +1,47 @@
+*-----------------------------------------------------------------------
+*     Isotope Distribution of NEVAP [mb]
+*-----------------------------------------------------------------------
+
+    1-H  isotope production
+ reg.         2         3
+   0  3.137E+02 3.137E+01
+
+    2-He isotope production
+ reg.         3         4
+   0  3.137E+01 3.294E+02
+
+   24-Cr isotope production
+ reg.        53        54
+   0  3.137E+01 1.568E+01
+
+   25-Mn isotope production
+ reg.        54        55        56        57
+   0  3.137E+01 1.568E+01 0.000E+00 1.568E+01
+
+   26-Fe isotope production
+ reg.        54        55        56
+   0  1.568E+01 0.000E+00 1.568E+01
+
+   27-Co isotope production
+ reg.        57        58        59        60        61        62
+   0  1.568E+01 0.000E+00 0.000E+00 0.000E+00 0.000E+00 1.568E+01
+
+   28-Ni isotope production
+ reg.        59        60        61        62        63
+   0  3.137E+01 3.137E+01 6.274E+01 0.000E+00 1.568E+01
+
+   29-Cu isotope production
+ reg.        61        62        63
+   0  1.568E+01 6.274E+01 3.137E+01
+
+   30-Zn isotope production
+ reg.        63        64        65        66        67
+   0  1.568E+01 0.000E+00 4.705E+01 4.705E+01 1.568E+01
+
+   31-Ga isotope production
+ reg.        67        68        69
+   0  4.705E+01 3.137E+01 3.137E+01
+
+   32-Ge isotope production
+ reg.        67        68        69
+   0  1.568E+01 3.137E+01 7.842E+01

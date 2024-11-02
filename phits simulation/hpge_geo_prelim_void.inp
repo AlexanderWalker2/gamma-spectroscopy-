@@ -1,0 +1,109 @@
+[ T i t l e ]
+geometry check using basic parameters
+
+[ P a r a m e t e r s ]
+ icntl    =           0     # (D=0) 3:ECH 5:NOR 6:SRC 7,8:GSH 11:DSH 12:DUMP
+ maxcas   =          100     # (D=10) number of particles per one batch
+ maxbch   =           5     # (D=10) number of batches
+ 
+[ S o u r c e ]
+   s-type =   1             # mono-energetic axial source
+     proj =  photon         # kind of incident particle         
+      dir =   all           # z-direction of beam [cosine]
+       r0 =   0.            # radius [cm]
+       z0 =   -3.            # minimum position of z-axis [cm]
+       z1 =   -3.            # maximum position of z-axis [cm]
+       e0 =   500.          # energy of beam [MeV/u]
+
+[ M a t e r i a l ]
+mat[1]    Ge 1
+mat[2]    Al 1
+mat[3]    N 8 O 2
+mat[4]    C 10 H 10 O 4
+mat[5]    Pb 1
+mat[6]    C 6 H 10 O 5 
+
+[ M a t N a m e C o l o r]
+   mat  name    color
+    1   Germanium   cyan
+    2   Aluminium  orange
+    3   Air      pastelblue
+    4   Mylar    yellow
+    5   Lead    pastelviolet
+    6   Wood    brown
+
+[ S u r f a c e ]
+  10  so      500          
+  11  cz 2.6 $ radius 2.6 = crystal
+  12  pz 0.0 $ detector starts at z=0
+  13  pz 3.74 $detector ends here
+  14  cz 0.45 $radius of HOLE cylinder (so gap in crystal)
+  15  pz 1.8 $where hole starts in detector
+  16  pz 3.74 $9.4 $where it ends (extends through whole holder)
+  18  pz 9.08 $3.2mm thickness, starts near bottom
+  19  pz 9.4 $bottom
+  20  cz 2.776 $radius of holder. THICKNESS 0.76 mm
+  21  pz 0.0 $hlder starts where crystal detector is
+  22  sz 1.8 0.45 $round part of detector
+  23  cz 2.7 
+  24  pz -0.1
+  25  pz -0.2
+  26  pz -0.33
+  27  cz 3
+  28  cz 2.9
+  29  pz 10
+  30  RPP -20 20 -20 20 2 3
+  31  RPP -3.25 3.25 -4.25 4.25 -2 -0.33
+  32  RPP -3.25 3.25 -4.25 4.25 -1 1
+  33  RPP 3.5 9.5 -4 4 -6 2
+  34  RPP -9.5 -3.5 -4 4 -6 2
+  35  RPP -10 10 -8 8 -14 2
+  36  RPP -16 16 -14 14 -14 2
+  37  RPP -14 14 -12 12 -15 -14
+  38  cz 1.5
+  39  RPP -20 20 -20 20 -20 20
+
+[ C e l l ]
+ 100     0       -10 #101 #102 #103 #104 #105 #106 #107 #108 #109 #110 #111$ 0 is INNER void -1 is OUTER void skip density! (-1.0 or -8.93..)
+ 101 3  -0.01    -39 #(-27 26 -29) #102 #107 #108 #109 #110 #111 $air
+ 102    -1        10
+ 103 1  -5.3234  -11 12 -13 #(-14 15 -16:-22) $detector cylinder
+ 104 2  -2.7     -20 21 -18 #(-23 21 -18) : (-20 18 -19 #(-14 18 -19))
+ 105 4  -1.38    -20 24 -21
+ 106 2  -2.7     -27 25 -29 #(-28 25 -29) : (-27 26 -25) 
+ 107 6  -0.5     -30 #(-27)
+ 108 5  -11.35   -32 #(-27) : -31 #(-38)
+ 109 5  -11.35   -33
+ 110 5  -11.35   -34
+ 111 5  -11.35   -36 35 : -37
+
+
+[ T - T r a c k ]
+     mesh =  xyz            # mesh type is xyz scoring mesh
+   x-type =    2            # x-mesh is linear given by xmin, xmax and nx
+       nx =  500            # number of x-mesh points
+     xmin =  -20.           # minimum value of x-mesh points
+     xmax =   20.           # maximum value of x-mesh points
+   y-type =    1            # y-mesh is given by the below data
+       ny =    1            # number of y-mesh points
+           -5.0  5.0
+   z-type =    2            # z-mesh is linear given by zmin, zmax and nz
+       nz =  500            # number of z-mesh points
+     zmin =  -20.           # minimum value of z-mesh points
+     zmax =   20.           # maximum value of z-mesh points
+   t-type =    2            # t-mesh is linear given by tmin, tmax and nt
+       nt =    10            # number of t-mesh points
+     tmin =   0.0           # minimum value of t-mesh points
+     tmax =   1.0           # maximum value of t-mesh points (0 to 1 in 0.1nsec increments)
+     part =  all      
+   e-type =    1            # e-mesh is given by the below data
+       ne =    1            # number of e-mesh points
+            0.0  1000.0
+     unit =    1            # unit is [1/cm^2/source]
+     axis =   xz            # axis of output
+     file = hpgegeo_void.out  # file name of output for the above axis
+    title = Track Detection using [T-track] tally
+    gshow =    3            # 0: no 1:bnd, 2:bnd+mat, 3:bnd+reg 4:bnd+lat
+   epsout =    1            # (D=0) generate eps file by ANGEL
+
+[ E n d ]
